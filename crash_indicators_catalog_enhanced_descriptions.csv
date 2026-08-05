@@ -1,0 +1,62 @@
+indicator category,indicator name,indicator formula,description
+Trend / moving averages,sma20,sma20 = c.rolling(20).mean(),20-period average closing price; rising values indicate a strengthening recent trend.
+Trend / moving averages,sma50,sma50 = c.rolling(50).mean(),50-period average closing price; summarizes the medium-term trend direction.
+Trend / moving averages,sma200,sma200 = c.rolling(200).mean(),200-period average closing price; a long-run market-regime reference.
+Volatility bands,bb_upper,"std20 = c.rolling(20).std(ddof=0)
+r['bb_upper'] = sma20 + 2 * std20",Upper expected price envelope; touches or breaks can signal unusually strong upside movement.
+Volatility bands,bb_lower,"std20 = c.rolling(20).std(ddof=0)
+r['bb_lower'] = sma20 - 2 * std20",Lower expected price envelope; touches or breaks can signal unusually strong downside movement.
+Volatility bands,bb_width,r['bb_width'] = (r['bb_upper'] - r['bb_lower']) / sma20,Relative band dispersion; high values mean elevated volatility and low values compression.
+Trend events,death_cross,r['death_cross'] = ((sma50.shift(1) > sma200.shift(1)) & (sma50 < sma200)).astype(int),One flags a bearish medium-to-long-horizon moving-average crossover.
+Trend events,golden_cross,r['golden_cross'] = ((sma50.shift(1) < sma200.shift(1)) & (sma50 > sma200)).astype(int),One flags a bullish medium-to-long-horizon moving-average crossover.
+Price range / extrema,minclose_20,r['minclose_20'] = c.rolling(20).min(),Recent downside reference; closeness to it indicates proximity to a 20-period low.
+Price range / extrema,maxclose_20,r['maxclose_20'] = c.rolling(20).max(),Recent upside reference; closeness to it indicates proximity to a 20-period high.
+Returns,logreturn,r['logreturn'] = np.log(c / c.shift(1)),Continuously compounded one-period return; positive means a gain and negative a loss.
+Close-to-close volatility,hv_126d_ann,r['hv_126d_ann'] = logret.rolling(n).std() * np.sqrt(252),Long-horizon annualized realized volatility; high values indicate an unstable risk regime.
+Close-to-close volatility,hv_10d_ann,r['hv_10d_ann'] = logret.rolling(10).std() * np.sqrt(252),Recent annualized realized volatility; spikes can reveal emerging market stress.
+Close-to-close volatility,hv_60d_ann,r['hv_60d_ann'] = logret.rolling(60).std() * np.sqrt(252),"Medium-horizon annualized realized volatility, less noisy than the 10-period measure."
+OHLC volatility,hv_parkinson_126d_ann,r['hv_parkinson_126d_ann'] = np.sqrt((1.0 / (4.0 * np.log(2))) * (log_hl ** 2).rolling(n).mean()) * np.sqrt(252),Range-based annualized volatility; captures intraperiod high-low variation.
+OHLC volatility,vol_gk,r['vol_gk'] = 0.5 * (log_hl ** 2).rolling(n).mean() - (2 * np.log(2) - 1) * (log_co ** 2).rolling(n).mean(),"Garman-Klass variance estimate using open, high, low and close information."
+OHLC volatility,hv_gk_126d_ann,r['hv_gk_126d_ann'] = r['vol_gk'].apply(lambda x: np.sqrt(x) if x > 0 else np.nan) * np.sqrt(252),Annualized Garman-Klass volatility; high values indicate greater OHLC price uncertainty.
+OHLC volatility,vol_rs,r['vol_rs'] = (log_ho * (log_ho - log_co) + log_lo * (log_lo - log_co)).rolling(n).mean(),"Rogers-Satchell variance estimate, designed to accommodate non-zero drift."
+OHLC volatility,hv_rs_126d_ann,r['hv_rs_126d_ann'] = r['vol_rs'].apply(lambda x: np.sqrt(x) if x > 0 else np.nan) * np.sqrt(252),Annualized drift-robust range volatility; higher values indicate a more volatile regime.
+Composite volatility,composite_vol,r['composite_vol'] = r[ohlc_vols].mean(axis=1),"Average of four volatility estimators, giving a less model-specific volatility signal."
+Composite volatility,hv_composite_21d_ann,r['hv_composite_21d_ann'] = r['composite_vol'].rolling(21).std(),Volatility-of-volatility; high values show that the estimated risk level is changing rapidly.
+Rolling distribution / tail levels,log_return_1d_q01_roll126d,r[f'log_return_1d_q{pct:02d}_roll126d'] = historical_returns.rolling(n).quantile(q),1st-percentile return threshold; a proxy for an extreme adverse daily outcome.
+Rolling distribution / tail levels,log_return_1d_q05_roll126d,r[f'log_return_1d_q{pct:02d}_roll126d'] = historical_returns.rolling(n).quantile(q),5th-percentile return threshold; summarizes the lower tail of recent returns.
+Rolling distribution / tail levels,log_return_1d_q95_roll126d,r[f'log_return_1d_q{pct:02d}_roll126d'] = historical_returns.rolling(n).quantile(q),95th-percentile return threshold; summarizes unusually strong positive daily moves.
+Rolling distribution / tail levels,log_return_1d_q99_roll126d,r[f'log_return_1d_q{pct:02d}_roll126d'] = historical_returns.rolling(n).quantile(q),99th-percentile return threshold; captures the most extreme positive return outcomes.
+Rolling distribution / tail levels,hv_126d_ann_q01_roll126d,r[f'hv_126d_ann_q{pct:02d}_roll126d'] = historical_volatility.rolling(n).quantile(q),Low percentile of long-window volatility; a benchmark for unusually calm conditions.
+Rolling distribution / tail levels,hv_126d_ann_q05_roll126d,r[f'hv_126d_ann_q{pct:02d}_roll126d'] = historical_volatility.rolling(n).quantile(q),"Lower-tail volatility benchmark, useful for identifying calm-volatility regimes."
+Rolling distribution / tail levels,hv_126d_ann_q95_roll126d,r[f'hv_126d_ann_q{pct:02d}_roll126d'] = historical_volatility.rolling(n).quantile(q),High percentile of long-window volatility; a threshold for elevated-risk conditions.
+Rolling distribution / tail levels,hv_126d_ann_q99_roll126d,r[f'hv_126d_ann_q{pct:02d}_roll126d'] = historical_volatility.rolling(n).quantile(q),"Extreme high-volatility threshold, useful for exceptional stress regimes."
+Momentum / MACD,macd_12_26_norm,r['macd_12_26_norm'] = macd / (c + eps),Normalized gap between 12- and 26-period EMAs; positive values show bullish momentum.
+Momentum / MACD,macd_signal_9_norm,r['macd_signal_9_norm'] = macd_signal / (c + eps),Smoothed MACD benchmark used to judge whether momentum is strengthening or weakening.
+Momentum / MACD,macd_hist_12_26_9_norm,r['macd_hist_12_26_9_norm'] = macd_hist / (c + eps),"MACD minus signal; positive values show strengthening bullish momentum, negative bearish."
+Momentum / rate of change,roc_5d,r['roc_5d'] = ((c / c.shift(5)) - 1) * 100,Short-run percentage momentum; large negatives flag abrupt sell-offs.
+Momentum / rate of change,roc_10d,r['roc_10d'] = ((c / c.shift(10)) - 1) * 100,"Ten-period percentage price change, showing intermediate short-term momentum."
+Momentum / rate of change,roc_20d,r['roc_20d'] = ((c / c.shift(20)) - 1) * 100,Twenty-period percentage price change; sustained negatives indicate persistent downside momentum.
+True range / ATR,tr_1d_points,"previous_close = c.shift(1)
+tr = pd.concat([h - l, (h - previous_close).abs(), (l - previous_close).abs()], axis=1).max(axis=1)
+r['tr_1d_points'] = tr",Current True Range in price points; spikes show an unusually large price move or gap.
+True range / ATR,atr_14d_points,"atr = wilder(tr, atr_period)
+r['atr_14d_points'] = atr",Wilder-smoothed typical 14-period trading range; high values mean wider normal movement.
+True range / ATR,tr_1d_norm,r['tr_1d_norm'] = tr / (c + eps),"Current trading range scaled by price, enabling cross-asset comparability."
+True range / ATR,atr_14d_norm,r['atr_14d_norm'] = atr / (c + eps),Typical relative range over 14 periods; high values mean greater proportional variability.
+True range / ATR,tr_to_atr_14d,r['tr_to_atr_14d'] = tr / atr,Current range relative to normal range; values well above one flag an unusually active bar.
+Volume / money flow,cmf_20d,r['cmf_20d'] = (mfm * v).rolling(20).sum() / v.rolling(20).sum(),"Volume-weighted buying versus selling pressure; positive values favor accumulation, negative values distribution."
+Volume / anomaly,volume_z_20d,r['volume_z_20d'] = (v - volume_mean_20d) / (volume_std_20d + eps),How unusual current volume is versus recent activity; positive extremes identify volume surges.
+Volume / directional flow,obv_flow_20d_norm,"r['obv_flow_20d_norm'] = rolling_signed_volume / rolling_total_volume.replace(0, np.nan)",Net up-close versus down-close volume share; positive readings indicate directional buying flow.
+Oscillators,stoch_k,r['stoch_k'] = 100 * (c - lowest_low) / (highest_high - lowest_low + eps),Location of close within its 14-period range; high values are near the range high.
+Oscillators,stoch_d,r['stoch_d'] = r['stoch_k'].rolling(3).mean(),Smoothed stochastic momentum; tracks changes in the %K range-position signal.
+Mean reversion / standardization,price_zscore_20d,r['price_zscore_20d'] = (c - sma20) / (c.rolling(20).std() + eps),Standardized distance from 20-period mean; large absolute values show unusual price displacement.
+Oscillators,rsi_14d,r['rsi_14d'] = 100 - (100 / (1 + avg_gain / (avg_loss + eps))),Bounded gain-versus-loss momentum; high readings show dominant recent gains and low readings losses.
+Oscillators,cci_20d,r['cci_20d'] = (tp - ma_tp) / (0.015 * md + eps),Typical-price deviation from its norm; large absolute values show unusually strong directional movement.
+Risk-adjusted performance,sharpe_20_ann_rf0,r['sharpe_20_ann_rf0'] = logret.rolling(20).mean() / (logret.rolling(20).std() + eps) * np.sqrt(252),Recent annualized return per unit of volatility; higher positive values indicate better risk-adjusted performance.
+Drawdown risk,dd_20,r['dd_20'] = (c / c.rolling(20).max() - 1) * 100,Current percentage loss from the trailing high; increasingly negative values show a deeper drawdown.
+Drawdown risk,ulcer_index,r['ulcer_index'] = np.sqrt((drawdown ** 2).rolling(14).mean()),Downside-pain measure: high values mean drawdowns have been deep and/or persistent.
+Trend strength / ADX,plus_di,r['plus_di'] = plus_di,Positive directional movement relative to ATR; higher values show stronger upward directional pressure.
+Trend strength / ADX,minus_di,r['minus_di'] = minus_di,Negative directional movement relative to ATR; higher values show stronger downward directional pressure.
+Trend strength / ADX,adx,"r['adx'] = wilder(dx, 14)","Trend-strength measure independent of direction; high values imply a strong trend, low values a range-bound market."
+Return distribution shape,skewness_60,r['skewness_60'] = logret.rolling(60).skew(),Return asymmetry; negative values indicate more pronounced downside-tail risk.
+Return distribution shape,kurtosis_60,r['kurtosis_60'] = logret.rolling(60).kurt(),Return tail heaviness; high positive values indicate more outlier-prone returns.
